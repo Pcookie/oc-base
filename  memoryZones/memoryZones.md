@@ -12,7 +12,7 @@ App程序启动，系统会把开启的那个App程序从Flash或ROM里面拷贝
 
 ####3、内存分区
 
-![内存分区图](https://github.com/Pcookie/oc-base/memoryZones/memoryZones/内存分区.png)
+![内存分区图](https://github.com/Pcookie/oc-base/blob/master/%20memoryZones/memoryZones/%E5%86%85%E5%AD%98%E5%88%86%E5%8C%BA.png)
 
 * 栈区(stack):
 	* 存放的局部变量、先进后出、一旦出了作用域就会被销毁；函数跳转地址，现场保护等；
