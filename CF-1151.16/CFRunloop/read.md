@@ -195,14 +195,13 @@ CFRunLoopAddObserver代码如下
 			CFSetRef set = rl->_commonModes ? CFSetCreateCopy(kCFAllocatorSystemDefault, rl->_commonModes) : NULL; rl->commonModes 存在就 拷贝一份 给set 如果不存在 就NULL
 			
 			/****************************************************************************************************/
-			/*			KCFALLOCATORDEFAULT	                    默认分配器，与传入NULL等价。                          */
+			/*        KCFALLOCATORDEFAULT	                    默认分配器，与传入NULL等价。                          */
 			/****************************************************************************************************/
-			/*        kCFAllocatorSystemDefault               原始的默认系统分配器。这个分配器用来应对万一用CFAllocatorSetDefault
-				                                              改变了默认分配器的情况，很少用到。
-			kCFAllocatorMalloc	           调用malloc、realloc和free。如果用malloc创建了内存，那这个分配器对于释放CFData和CFString就很有用。
-			kCFAllocatorMallocZone			 在默认的malloc区域中创建和释放内存。在 Mac 上开启了垃圾收集的话，这个分配器会很有用，但在 iOS 中基本上没什么用。
-			kCFAllocatorNull	              什么都不做。跟kCFAllocatorMalloc一样，如果不想释放内存，这个分配器对于释放CFData和CFString就很有用。
-			KCFAllocatorUseContext	       只有CFAllocatorCreate函数用到。创建CFAllocator时，系统需要分配内存。就像其他所有的Create方法，也需要一个分配器。这个特殊的分配器告诉CFAllocatorCreate用传入的函数来分配CFAllocator。
+			/*        kCFAllocatorSystemDefault               原始的默认系统分配器。这个分配器用来应对万一用CFAllocatorSetDefault改变了默认分配器的情况，很少用到。
+			/*        kCFAllocatorMalloc	                    调用malloc、realloc和free。如果用malloc创建了内存，那这个分配器对于释放CFData和CFString就很有用。
+			/*        kCFAllocatorMallocZone                  在默认的malloc区域中创建和释放内存。在 Mac 上开启了垃圾收集的话，这个分配器会很有用，但在 iOS 中基本上没什么用。
+			/*        kCFAllocatorNull                        什么都不做。跟kCFAllocatorMalloc一样，如果不想释放内存，这个分配器对于释放CFData和CFString就很有用。
+			/*        KCFAllocatorUseContext                  只有CFAllocatorCreate函数用到。创建CFAllocator时，系统需要分配内存。就像其他所有的Create方法，也需要一个分配器。这个特殊的分配器告诉CFAllocatorCreate用传入的函数来分配CFAllocator。
 			/****************************************************************************************************/
 			
 			if (NULL == rl->_commonModeItems) {
