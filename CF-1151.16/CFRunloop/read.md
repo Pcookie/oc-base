@@ -1,6 +1,8 @@
 ##CFRunLoop 
+请对照文件夹中CFRunloop.c看
+
 ###(一)weakup&sleep
-#####摘自[简书](http://www.jianshu.com/p/9619d3f3722e)
+
 __CFRunLoopRun 使用mach_absolute_time这个函数拿了循环时间戳 初始化端口队列之类的事情  执行了CFRunLoopTimeout函数 内部调用 CFRunLoopWakeUp 内部调用
 
 	㈠ ret = __CFSendTrivialMachMessage(rl->_wakeUpPort, 0, MACH_SEND_TIMEOUT, 0);
@@ -20,7 +22,9 @@ runloop创建的代码__CFRunLoopCreate 其中有一句
 	㈢ loop->_wakeUpPort = CFPortAllocate();
 
 实现了wakeUpPort的创建
+
 ####当wakeUpPort收到消息后由谁来处理
+
 在__CFRunLoopServiceMachPort内部有这样一句
 
 	㈣ ret = mach_msg(msg, MACH_RCV_MSG|MACH_RCV_LARGE|((TIMEOUT_INFINITY != timeout) ? MACH_RCV_TIMEOUT :0)|MACH_RCV_TRAILER_TYPE(MACH_MSG_TRAILER_FORMAT_0)|MACH_RCV_TRAILER_ELEMENTS(MACH_RCV_TRAILER_AV),0, msg->msgh_size, port, timeout, MACH_PORT_NULL);
@@ -32,7 +36,7 @@ sleep本质上来说就是通过调用mach_msg使runloop进入等待消息的状
 wakeup本质上来说就是通过发送一套消息给mach_msg监听的端口打破mach_msg等待的状态继续向下执行。
 
 ###(二) mode
-#####摘自[简书](http://www.jianshu.com/p/e82a0b4c375e)
+
 __CFRunLoop及业务逻辑
 
 	struct __CFRunLoop {
@@ -195,7 +199,7 @@ CFRunLoopAddObserver代码如下
 			CFSetRef set = rl->_commonModes ? CFSetCreateCopy(kCFAllocatorSystemDefault, rl->_commonModes) : NULL; rl->commonModes 存在就 拷贝一份 给set 如果不存在 就NULL
 			
 			/****************************************************************************************************/
-			/*        KCFALLOCATORDEFAULT	                    默认分配器，与传入NULL等价。                          */
+			/*        KCFALLOCATORDEFAULT	                    默认分配器，与传入NULL等价。                       */
 			/****************************************************************************************************/
 			/*        kCFAllocatorSystemDefault               原始的默认系统分配器。这个分配器用来应对万一用CFAllocatorSetDefault改变了默认分配器的情况，很少用到。
 			/*        kCFAllocatorMalloc	                    调用malloc、realloc和free。如果用malloc创建了内存，那这个分配器对于释放CFData和CFString就很有用。
@@ -204,7 +208,7 @@ CFRunLoopAddObserver代码如下
 			/*        KCFAllocatorUseContext                  只有CFAllocatorCreate函数用到。创建CFAllocator时，系统需要分配内存。就像其他所有的Create方法，也需要一个分配器。这个特殊的分配器告诉CFAllocatorCreate用传入的函数来分配CFAllocator。
 			/****************************************************************************************************/
 			
-			if (NULL == rl->_commonModeItems) {
+			if (NULL == rl->_commonModeItems) { 如果items为空
 	    		rl->_commonModeItems = CFSetCreateMutable(kCFAllocatorSystemDefault, 0, &kCFTypeSetCallBacks);
 			}
 			CFSetAddValue(rl->_commonModeItems, rlo);
@@ -241,7 +245,11 @@ CFRunLoopAddObserver代码如下
     	}
     	__CFRunLoopUnlock(rl);
 	}
+	
+###参考文章
 
+* [简书](http://www.jianshu.com/u/2c344e8f8b3d)
+* [码迷](http://www.mamicode.com/info-detail-1756855.html)
 
 
 
