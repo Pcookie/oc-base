@@ -3057,23 +3057,24 @@ void CFRunLoopAddObserver(CFRunLoopRef rl, CFRunLoopObserverRef rlo, CFStringRef
     if (!__CFIsValid(rlo) || (NULL != rlo->_runLoop && rlo->_runLoop != rl)) return;
     __CFRunLoopLock(rl);
     if (modeName == kCFRunLoopCommonModes) {
-	CFSetRef set = rl->_commonModes ? CFSetCreateCopy(kCFAllocatorSystemDefault, rl->_commonModes) : NULL;
-	if (NULL == rl->_commonModeItems) {
-	    rl->_commonModeItems = CFSetCreateMutable(kCFAllocatorSystemDefault, 0, &kCFTypeSetCallBacks);
-	}
-	CFSetAddValue(rl->_commonModeItems, rlo);
-	if (NULL != set) {
-	    CFTypeRef context[2] = {rl, rlo};
-	    /* add new item to all common-modes */
-	    CFSetApplyFunction(set, (__CFRunLoopAddItemToCommonModes), (void *)context);
-	    CFRelease(set);
-	}
+        CFSetRef set = rl->_commonModes ? CFSetCreateCopy(kCFAllocatorSystemDefault, rl->_commonModes) : NULL;
+        if (NULL == rl->_commonModeItems) {
+            rl->_commonModeItems = CFSetCreateMutable(kCFAllocatorSystemDefault, 0, &kCFTypeSetCallBacks);
+        }
+        CFSetAddValue(rl->_commonModeItems, rlo);
+        if (NULL != set) {
+            CFTypeRef context[2] = {rl, rlo};
+            /* add new item to all common-modes */
+            CFSetApplyFunction(set, (__CFRunLoopAddItemToCommonModes), (void *)context);
+            CFRelease(set);
+        }
     } else {
-	rlm = __CFRunLoopFindMode(rl, modeName, true);
-	if (NULL != rlm && NULL == rlm->_observers) {
-	    rlm->_observers = CFArrayCreateMutable(kCFAllocatorSystemDefault, 0, &kCFTypeArrayCallBacks);
-	}
-	if (NULL != rlm && !CFArrayContainsValue(rlm->_observers, CFRangeMake(0, CFArrayGetCount(rlm->_observers)), rlo)) {
+        rlm = __CFRunLoopFindMode(rl, modeName, true);
+        if (NULL != rlm && NULL == rlm->_observers) {
+            
+            rlm->_observers = CFArrayCreateMutable(kCFAllocatorSystemDefault, 0, &kCFTypeArrayCallBacks);
+        }
+        if (NULL != rlm && !CFArrayContainsValue(rlm->_observers, CFRangeMake(0, CFArrayGetCount(rlm->_observers)), rlo)) {
             Boolean inserted = false;
             for (CFIndex idx = CFArrayGetCount(rlm->_observers); idx--; ) {
                 CFRunLoopObserverRef obs = (CFRunLoopObserverRef)CFArrayGetValueAtIndex(rlm->_observers, idx);
@@ -3084,14 +3085,14 @@ void CFRunLoopAddObserver(CFRunLoopRef rl, CFRunLoopObserverRef rlo, CFStringRef
                 }
             }
             if (!inserted) {
-	        CFArrayInsertValueAtIndex(rlm->_observers, 0, rlo);
+                CFArrayInsertValueAtIndex(rlm->_observers, 0, rlo);
             }
-	    rlm->_observerMask |= rlo->_activities;
-	    __CFRunLoopObserverSchedule(rlo, rl, rlm);
-	}
+            rlm->_observerMask |= rlo->_activities;
+            __CFRunLoopObserverSchedule(rlo, rl, rlm);
+        }
         if (NULL != rlm) {
-	    __CFRunLoopModeUnlock(rlm);
-	}
+            __CFRunLoopModeUnlock(rlm);
+        }
     }
     __CFRunLoopUnlock(rl);
 }

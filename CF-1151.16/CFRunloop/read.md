@@ -195,7 +195,7 @@ CFRunLoopAddObserver代码如下
     	if (__CFRunLoopIsDeallocating(rl)) return; // 判断是否正在销毁
     	if (!__CFIsValid(rlo) || (NULL != rlo->_runLoop && rlo->_runLoop != rl)) return; // 判断 rlo 失效  或者 （rlo->rl 存在并且 rlo->rl不等于rl） 两个条件有一个成立 就直接return
     	__CFRunLoopLock(rl); // rl加锁 内部调用pthread_mutex_lock加锁  当pthread_mutex_lock()返回时，该互斥锁已被锁定。线程调用该函数让互斥锁上锁，如果该互斥锁已被另一个线程锁定和拥有，则调用该线程将阻塞，直到该互斥锁变为可用为止
-    	if (modeName == kCFRunLoopCommonModes) { 如果观察的是这个字段 就是想看所有mode
+    	if (modeName == kCFRunLoopCommonModes) { 如果观察的是这个字段 
 			CFSetRef set = rl->_commonModes ? CFSetCreateCopy(kCFAllocatorSystemDefault, rl->_commonModes) : NULL; rl->commonModes 存在就 拷贝一份 给set 如果不存在 就NULL
 			
 			/****************************************************************************************************/
@@ -210,42 +210,167 @@ CFRunLoopAddObserver代码如下
 			
 			if (NULL == rl->_commonModeItems) { 如果items为空
 	    		rl->_commonModeItems = CFSetCreateMutable(kCFAllocatorSystemDefault, 0, &kCFTypeSetCallBacks);
+	    		就创建一份默认的给他 如果没错的话 默认里面会有2个runloopmode
 			}
 			CFSetAddValue(rl->_commonModeItems, rlo);
+			然后把观察者加上
 			if (NULL != set) {
+				如果rl->_commonModes存在 则set就有内容 那么就会执行到这里 目测这里是创建新的  不属于2个默认mode的时候 会走到这里
 			    CFTypeRef context[2] = {rl, rlo};
 			    /* add new item to all common-modes */
+			    把新的mode 加到common-modes里面
 			    CFSetApplyFunction(set, (__CFRunLoopAddItemToCommonModes), (void *)context);
 			    CFRelease(set);
 			}
     	} else {
+	    	如果观察的不是kCFRunLoopCommonModes字段 就是modename不是kCFRunLoopCommonModes
 			rlm = __CFRunLoopFindMode(rl, modeName, true);
+			// 如果runloopmode存在且runloopmode里面的observers为空
 			if (NULL != rlm && NULL == rlm->_observers) {
+				给runloopmode里面的observers初始化
 	    		rlm->_observers = CFArrayCreateMutable(kCFAllocatorSystemDefault, 0, &kCFTypeArrayCallBacks);
 			}
+			/**
+			runloopmode 存在 且 CFArrayContainsValue(runloop里面的观察者数组，范围(0, 观察者个数), runloopobserver)
+			看样子是判断runloop里面的观察数组里面是否存在runloopserver 
+			这样的话  这句话就读成  runloopmode存在且runloop里面的观察数组不存在这个runloopserver的时候执行到括号里面
+			**/
 			if (NULL != rlm && !CFArrayContainsValue(rlm->_observers, CFRangeMake(0, CFArrayGetCount(rlm->_observers)), rlo)) {
+				初始一个标志 表示rlo 是否插入
            	Boolean inserted = false;
+				循环runloopmode里面observers数组长度
             	for (CFIndex idx = CFArrayGetCount(rlm->_observers); idx--; ) {
+					倒序 一个一个拿数组里面的observer
                 	CFRunLoopObserverRef obs = (CFRunLoopObserverRef)CFArrayGetValueAtIndex(rlm->_observers, idx);
+                	如果observer的order <= runloopobserver的order（输入）
                 	if (obs->_order <= rlo->_order) {
+						就把runloopobserver插入到数组中的idx+1的位置
                  	CFArrayInsertValueAtIndex(rlm->_observers, idx + 1, rlo);
+                 	标志置true
                     inserted = true;
+                    //跳出循环
                     break;
                 }
             	}
+            	如果没有插入 说明 observer的order 大于输入的 runloopobserver的order
             	if (!inserted) {
+            		就插入到 0 位置
 	        		CFArrayInsertValueAtIndex(rlm->_observers, 0, rlo);
             	}
+				类似如果数组有数 插到最后 没有 插在开头的样子  当然 逻辑的判断条件是以observer的order作为判断  不知道这点是为什么 可以看下order是做什么用的
+				// 这步没看懂 
 	    		rlm->_observerMask |= rlo->_activities;
+	    		传入 runloopobserver runloop runloopmode 给runloopobserver加锁 （判断runloopobserver的_rlCount如果等于0的话  就将 runloopobserver的runloop 赋值成传入的runloop ） runloopobserver的_rlCount自增长 解锁 runloopobserver
 	    		__CFRunLoopObserverSchedule(rlo, rl, rlm);
 			}
+			如果runloopmode存在 解锁
         	if (NULL != rlm) {
 	    	__CFRunLoopModeUnlock(rlm);
 			}
     	}
+    	给runloop解锁
     	__CFRunLoopUnlock(rl);
 	}
 	
+	static void __CFRunLoopObserverSchedule(CFRunLoopObserverRef rlo, CFRunLoopRef rl, CFRunLoopModeRef rlm) 	{
+    	__CFRunLoopObserverLock(rlo);
+		if (0 == rlo->_rlCount) {
+			rlo->_runLoop = rl;
+		}
+    	rlo->_rlCount++;
+    	__CFRunLoopObserverUnlock(rlo);
+	}
+	
+额外 
+
+	struct __CFRunLoopObserver {
+    	pthread_mutex_t _lock;
+	};
+	pthread_mutex_lock(&(__CFRunLoopObserver->_lock)) 加锁
+	pthread_mutex_unlock(&(__CFRunLoopObserver->_lock)) 解锁
+	
+CFRunLoopAddObserver代码如下
+
+	从代码格式 和 addobserver很像 开头都是判断条件不符合就返回 然后给runloop加锁 然后根据modename 开始各个条件的执行
+	void CFRunLoopAddTimer(CFRunLoopRef rl, CFRunLoopTimerRef rlt, CFStringRef modeName) {    
+		CHECK_FOR_FORK();
+		if (__CFRunLoopIsDeallocating(rl)) return;
+    	if (!__CFIsValid(rlt) || (NULL != rlt->_runLoop && rlt->_runLoop != rl)) return;
+    	__CFRunLoopLock(rl);
+    	
+    	if (modeName == kCFRunLoopCommonModes) {
+			CFSetRef set = rl->_commonModes ? CFSetCreateCopy(kCFAllocatorSystemDefault, rl->_commonModes) : NULL;
+			if (NULL == rl->_commonModeItems) {
+	    		rl->_commonModeItems = CFSetCreateMutable(kCFAllocatorSystemDefault, 0, &kCFTypeSetCallBacks);
+			}
+			CFSetAddValue(rl->_commonModeItems, rlt);
+			if (NULL != set) {
+	    		CFTypeRef context[2] = {rl, rlt};
+	    		/* add new item to all common-modes */
+	    		CFSetApplyFunction(set, (__CFRunLoopAddItemToCommonModes), (void *)context);
+	    		CFRelease(set);
+			}
+    	} else {
+			CFRunLoopModeRef rlm = __CFRunLoopFindMode(rl, modeName, true);
+			从这里开始  才和 楼上addobserver的不同 
+			先判断 runloopmode 是否存在
+			if (NULL != rlm) { 
+				然后判断 runloopmode的timers是否为空
+				if (NULL == rlm->_timers) {
+					如果为空 就创建(初始化)runloopmode->_timers
+	          	CFArrayCallBacks cb = kCFTypeArrayCallBacks;
+             		cb.equal = NULL;
+	          	rlm->_timers = CFArrayCreateMutable(kCFAllocatorSystemDefault, 0, &cb);
+            	}
+			}
+			如果runloopmode存在 且 集合 runlooptimer的runloopmodes 里面不存在 叫 name 的 runloopmode
+			if (NULL != rlm && !CFSetContainsValue(rlt->_rlModes, rlm->_name)) {
+				加锁 runlooptimer
+				__CFRunLoopTimerLock(rlt);
+				如果runlooptimer的runloop 为空
+				if (NULL == rlt->_runLoop) {
+					就把 runloop 赋值给 runlooptimer的runloop
+					rlt->_runLoop = rl;
+					否则 再判断 当前runlooptimer里面的runloop 是否和输入的runloop相同 如果不等
+				} else if (rl != rlt->_runLoop) {
+					就解锁 runlooptimer
+					__CFRunLoopTimerUnlock(rlt);
+					解锁 runloopmode
+					__CFRunLoopModeUnlock(rlm);
+					解锁 runloop
+					__CFRunLoopUnlock(rl);
+					返回
+					return;
+				}
+				讲runlooptimer的runloopmodes集合 增加一个runloopmode里面的name ？？？ 这句是我看错了嘛 我觉得应该加的是mode才对。。怎么加个name进去了
+				CFSetAddValue(rlt->_rlModes, rlm->_name);
+				解锁 runlooptimer
+				__CFRunLoopTimerUnlock(rlt);
+				加锁
+				__CFRunLoopTimerFireTSRLock();
+				复位runloopmode中的runlooptimer
+				__CFRepositionTimerInMode(rlm, rlt, false);
+				解锁
+				__CFRunLoopTimerFireTSRUnlock();
+				判断是否执行链接后
+				if (!_CFExecutableLinkedOnOrAfter(CFSystemVersionLion)) {
+					一些开发吐槽
+					// Normally we don't do this on behalf of clients, but for
+					// backwards compatibility due to the change in timer handling...
+					如果runloop不是current runloop 就 唤醒 runloop
+                if (rl != CFRunLoopGetCurrent()) CFRunLoopWakeUp(rl);
+            	}
+			}
+			如果runloopmode存在
+			if (NULL != rlm) {
+				就解锁runloopmode
+				__CFRunLoopModeUnlock(rlm);
+			}
+    	}
+    	解锁runloop
+    	__CFRunLoopUnlock(rl);
+	}
+
 ###参考文章
 
 * [简书](http://www.jianshu.com/u/2c344e8f8b3d)
